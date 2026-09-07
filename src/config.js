@@ -1,11 +1,12 @@
-// Hardcoded starting coordinate for the prototype.
-// Swap this for the real deployment site before recruiting testers.
+// Walk origin: 84-20 Corona Ave, Elmhurst, Queens 11373.
+// Nominatim road centroid for Corona Ave (11373): 40.7405, -73.8765.
+// Prior value (40.7374, -73.8711) was ~700m SE; corrected 2026-09-07.
 export const START_COORD = {
-  lat: 40.748447,
-  lng: -73.985662,
+  lat: 40.7405,
+  lng: -73.8765,
 }
 
-export const START_LABEL = "Start point"
+export const START_LABEL = "84-20 Corona Ave, Elmhurst"
 
 // ---------------------------------------------------------------------------
 // Geolocation + catch-gate constants
