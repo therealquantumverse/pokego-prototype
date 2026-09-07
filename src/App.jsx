@@ -57,12 +57,18 @@ function AccuracyCircle({ position, accuracy }) {
 }
 
 function DeniedModal() {
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent)
+  const instructions = isIOS
+    ? 'Go to Settings → Privacy & Security → Location Services → Safari → set to "While Using".'
+    : 'Tap the 🔒 lock icon in your browser address bar → Site settings → Location → Allow.'
   return (
     <div className="modal-backdrop" role="alertdialog" aria-modal="true">
       <div className="modal">
-        <h2>Location needed</h2>
-        <p>This game finds creatures near you on the map — it needs your GPS position. Enable location access to play.</p>
-        <button className="btn-primary">Got it</button>
+        <h2>Location blocked</h2>
+        <p>This game needs your GPS position to work. Your browser has location turned off for this page.</p>
+        <p className="modal-instructions">{instructions}</p>
+        <p className="modal-instructions">Then tap Reload below.</p>
+        <button className="btn-primary" onClick={() => window.location.reload()}>Reload</button>
       </div>
     </div>
   )

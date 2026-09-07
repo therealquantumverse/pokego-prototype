@@ -163,8 +163,16 @@ body {
 .modal p {
   font-size: 14px;
   color: #374151;
-  margin: 0 0 16px;
+  margin: 0 0 12px;
   line-height: 1.5;
+}
+.modal-instructions {
+  font-size: 13px;
+  color: #6b7280;
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 0 0 10px !important;
 }
 .btn-primary {
   width: 100%;
