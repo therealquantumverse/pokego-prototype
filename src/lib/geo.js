@@ -68,11 +68,13 @@ export function useGeolocation() {
         retriesLeft -= 1
         return // retry silently; watchPosition will re-fire
       }
-      statusRef.current = 'unavailable'
       const label =
         err.code === err.PERMISSION_DENIED ? 'denied'
         : err.code === err.POSITION_UNAVAILABLE ? 'unavailable'
         : 'unavailable'
+      // Set the ref to the *resolved* label (galaxy review) so the ref and state
+      // never disagree, even for the transient `denied` case.
+      statusRef.current = label
       setState({ status: label, position: null, accuracy: null, error: err.message })
     }
 
