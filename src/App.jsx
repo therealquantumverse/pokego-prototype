@@ -116,10 +116,24 @@ function getArm() {
   return 'A'
 }
 
+function StartScreen({ onStart }) {
+  return (
+    <div className="modal-backdrop">
+      <div className="modal">
+        <h2>PokéGo Prototype</h2>
+        <p>Tap below to enable your GPS and start the walk on Corona Ave.</p>
+        <p className="modal-instructions">When your browser asks "Allow location?", tap <strong>Allow</strong>.</p>
+        <button className="btn-primary" onClick={onStart}>Enable GPS &amp; Start</button>
+      </div>
+    </div>
+  )
+}
+
 // ── App ──────────────────────────────────────────────────────────────────────
 
 function App() {
-  const geo = useGeolocation()
+  const [started, setStarted] = useState(false)
+  const geo = useGeolocation(started)
   const [arm] = useState(getArm)
   const [map, setMap] = useState(null)
   const handleMap = useCallback((m) => setMap(m), [])
@@ -237,6 +251,7 @@ function App() {
           })}
         </MapContainer>
         <RecenterButton map={map} position={geo.position} />
+        {!started && <StartScreen onStart={() => setStarted(true)} />}
         {showDenied && <DeniedModal />}
         {toast && <div className="toast" role="status">{toast}</div>}
       </div>

@@ -25,7 +25,9 @@ export function distanceMeters(a, b) {
 //     accuracy: number | null          // most recent coords.accuracy (meters)
 //     error: string | null             // last error message
 //   }
-export function useGeolocation() {
+// Pass enabled=false to keep in 'idle' until a user gesture fires (iOS Safari
+// will silently drop watchPosition calls made without a user interaction).
+export function useGeolocation(enabled = true) {
   const [state, setState] = useState({
     status: 'idle',
     position: null,
@@ -36,6 +38,7 @@ export function useGeolocation() {
   const statusRef = useRef(state.status)
 
   useEffect(() => {
+    if (!enabled) return
     if (!('geolocation' in navigator)) {
       setState({ status: 'unavailable', position: null, accuracy: null, error: 'Geolocation not supported' })
       return
