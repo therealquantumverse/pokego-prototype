@@ -192,19 +192,27 @@ export default function App() {
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
 
-    const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style:     MAP_STYLE,
-      center:    [FALLBACK_CENTER.lng, FALLBACK_CENTER.lat],
-      zoom:      17,
-      pitch:     45,           // Pokémon GO perspective tilt
-      bearing:   0,
-      pitchWithRotate: true,
-      attributionControl: false,
-    })
+    let map
+    try {
+      map = new maplibregl.Map({
+        container: mapContainerRef.current,
+        style:     MAP_STYLE,
+        center:    [FALLBACK_CENTER.lng, FALLBACK_CENTER.lat],
+        zoom:      17,
+        pitch:     45,           // Pokémon GO perspective tilt
+        bearing:   0,
+        pitchWithRotate: true,
+        attributionControl: false,
+        failIfMajorPerformanceCaveat: false,   // allow software WebGL fallback
+      })
+    } catch (err) {
+      console.error('[map] Map init failed:', err)
+      return
+    }
 
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
     map.on('load', () => setMapReady(true))
+    map.on('error', (e) => console.error('[map] runtime error:', e))
 
     mapRef.current = map
 

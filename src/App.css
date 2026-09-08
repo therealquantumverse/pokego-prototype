@@ -34,14 +34,14 @@ body {
   position: absolute;
   inset: 0;
   z-index: 0;
-}
-/* MapLibre GL container fills map-wrap */
-.map-wrap canvas.maplibregl-canvas {
+  /* Dark theme: apply filter to the container div, NOT the WebGL canvas directly.
+     Filtering the canvas element itself can kill the WebGL context on mobile Safari. */
   filter: invert(100%) hue-rotate(180deg) brightness(90%) contrast(88%) saturate(0.85);
 }
-/* Keep attribution readable after filter */
-.maplibregl-ctrl-attrib {
-  filter: invert(100%) hue-rotate(180deg);
+/* Counter-invert MapLibre controls so they stay legible */
+.map-wrap .maplibregl-ctrl-attrib,
+.map-wrap .maplibregl-ctrl-group {
+  filter: invert(100%) hue-rotate(180deg) brightness(90%) contrast(88%) saturate(0.85);
 }
 
 /* ── Top overlay ────────────────────────────────────────────────────────────── */
