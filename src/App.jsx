@@ -2,11 +2,12 @@ import { MapContainer, TileLayer, Marker, Circle, useMap } from 'react-leaflet'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { ACCURACY_GATE, CATCH_RADIUS } from './config'
+import { ACCURACY_GATE, CATCH_RADIUS, STARTING_BALLS } from './config'
 import { useGeolocation, isCalibrated, distanceMeters } from './lib/geo'
 import { logCatchAttempt } from './lib/log'
-import { CLUSTER_META } from './pois'
-import { loadOrCreateSpawn, spawnRare, getInitialMapCenter } from './lib/spawn'
+import { ivPercent } from './lib/stats'
+import { spawnsNear, secondsUntilDespawn, rememberHome, getInitialMapCenter } from './lib/spawn'
+import ThrowMinigame from './ThrowMinigame'
 import './App.css'
 
 // ── Marker icons ─────────────────────────────────────────────────────────────
@@ -18,8 +19,10 @@ const playerIcon = L.divIcon({
   iconAnchor: [14, 14],
 })
 
+const RARE_TIERS = new Set(['rare', 'epic', 'legendary'])
+
 function makeCreatureIcon(poi, state) {
-  const cls = ['creature-wrap', state, poi.isRare ? 'rare' : ''].filter(Boolean).join(' ')
+  const cls = ['creature-wrap', state, RARE_TIERS.has(poi.rarity) ? 'rare' : ''].filter(Boolean).join(' ')
   return L.divIcon({
     className: '',
     html: `<div class="${cls}">
@@ -135,62 +138,52 @@ function WaitingForGps() {
   )
 }
 
-function EncounterCard({ poi, geo, onCatch, onFlee }) {
-  const dist = geo.position ? distanceMeters(geo.position, poi) : null
-  return (
-    <div className="encounter-backdrop" onClick={onFlee}>
-      <div className="encounter-card" onClick={e => e.stopPropagation()}>
-        <div className="encounter-header">
-          <span className="encounter-emoji">{poi.emoji}</span>
-          <h2 className="encounter-name">{poi.name}</h2>
-          {dist != null && <p className="encounter-dist">{Math.round(dist)}m away</p>}
-          {poi.isRare && <span className="encounter-rare-badge">✨ RARE</span>}
-        </div>
-        <button className="btn-catch" onClick={onCatch}>🎯 Catch!</button>
-        <button className="btn-flee" onClick={onFlee}>Run Away</button>
-      </div>
-    </div>
-  )
-}
-
 // ── App ───────────────────────────────────────────────────────────────────────
 
-// Default map center — shown only before GPS fires for the first time.
 const FALLBACK_CENTER = getInitialMapCenter() || { lat: 40.7128, lng: -74.006 }
 
 function App() {
   const [started, setStarted] = useState(() => localStorage.getItem('gps_started') === '1')
   const geo = useGeolocation(started)
 
-  const [map, setMap]       = useState(null)
-  const handleMap           = useCallback((m) => setMap(m), [])
+  const [map, setMap]     = useState(null)
+  const handleMap         = useCallback((m) => setMap(m), [])
+  const [spawned, setSpawned] = useState(null)
 
-  // Spawned creatures — null until first calibrated GPS fix
-  const [spawned, setSpawned]               = useState(null)
-  const spawnTriggered                       = useRef(false)
-
-  // Caught set and unlocked rares — persisted across reloads
   const [caught, setCaught] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem('pokego_caught') || '[]')) } catch { return new Set() }
   })
-  const [unlockedRareClusters, setUnlockedRareClusters] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('pokego_rares') || '[]')) } catch { return new Set() }
+
+  // Ball inventory — persisted
+  const [balls, setBalls] = useState(() => {
+    const saved = parseInt(localStorage.getItem('pokego_balls') ?? '', 10)
+    return Number.isFinite(saved) ? saved : STARTING_BALLS
   })
 
   const [toast, setToast]       = useState(null)
-  const [encounter, setEncounter] = useState(null)
+  const [encounter, setEncounter] = useState(null)  // poi being thrown at
   const toastTimer               = useRef(null)
   const [gpsStuck, setGpsStuck]  = useState(false)
   const stuckTimer               = useRef(null)
 
   useEffect(() => () => clearTimeout(toastTimer.current), [])
 
-  // Spawn creatures once GPS gets a clean fix
+  const posRef = useRef(null)
+  const ready  = isCalibrated(geo) && !!geo.position
+  if (ready) posRef.current = geo.position
+
   useEffect(() => {
-    if (spawnTriggered.current || !isCalibrated(geo) || !geo.position) return
-    spawnTriggered.current = true
-    setSpawned(loadOrCreateSpawn(geo.position, distanceMeters))
-  }, [geo])
+    if (!ready) return
+    const refresh = () => {
+      const p = posRef.current
+      if (!p) return
+      rememberHome(p)
+      setSpawned(spawnsNear(p))
+    }
+    refresh()
+    const t = setInterval(refresh, 10000)
+    return () => clearInterval(t)
+  }, [ready])
 
   useEffect(() => {
     if (geo.status === 'waiting') {
@@ -208,19 +201,18 @@ function App() {
     toastTimer.current = setTimeout(() => setToast(null), 2800)
   }, [])
 
-  // Persist caught and rares to localStorage
   useEffect(() => {
     localStorage.setItem('pokego_caught', JSON.stringify([...caught]))
   }, [caught])
-  useEffect(() => {
-    localStorage.setItem('pokego_rares', JSON.stringify([...unlockedRareClusters]))
-  }, [unlockedRareClusters])
 
-  const allPois = useMemo(() => {
-    if (!spawned) return []
-    const rares = [...unlockedRareClusters].map(key => spawnRare(key, spawned)).filter(Boolean)
-    return [...spawned, ...rares]
-  }, [spawned, unlockedRareClusters])
+  useEffect(() => {
+    localStorage.setItem('pokego_balls', String(balls))
+  }, [balls])
+
+  const allPois = useMemo(
+    () => (spawned || []).filter(p => !caught.has(p.id)),
+    [spawned, caught],
+  )
 
   function poiState(poi) {
     if (caught.has(poi.id)) return 'caught'
@@ -229,66 +221,51 @@ function App() {
   }
 
   function handleMarkerClick(poi) {
-    if (caught.has(poi.id)) {
-      showToast(`Already caught ${poi.emoji}`)
-      return
-    }
-
-    const dist = geo.position ? distanceMeters(geo.position, poi) : null
-
+    if (caught.has(poi.id)) { showToast(`Already caught ${poi.emoji}`); return }
     if (!isCalibrated(geo) || !geo.position) {
       showToast(`GPS calibrating — wait for accuracy < ${ACCURACY_GATE}m`)
-      logCatchAttempt({ outcome: 'gate_blocked', distance: dist, accuracy: geo.accuracy, poi })
+      logCatchAttempt({ outcome: 'gate_blocked', distance: null, accuracy: geo.accuracy, poi })
       return
     }
+    const dist = distanceMeters(geo.position, poi)
     if (dist > CATCH_RADIUS) {
       showToast(`Too far! Move ${Math.round(dist - CATCH_RADIUS)}m closer`)
       logCatchAttempt({ outcome: 'gate_blocked', distance: dist, accuracy: geo.accuracy, poi })
       return
     }
-
+    if (balls <= 0) { showToast('No balls left! Walk to find a PokéStop.'); return }
     setEncounter(poi)
   }
 
-  function handleCatch() {
-    const poi = encounter
-    if (!poi) return
+  function handleCatch(poi, bonus) {
+    setCaught(prev => new Set(prev).add(poi.id))
+    setBalls(b => Math.max(0, b - 1))
+    logCatchAttempt({ outcome: 'caught', bonus: bonus.label, accuracy: geo.accuracy, poi })
     setEncounter(null)
+    showToast(`${bonus.label} Caught ${poi.emoji} ${poi.name} — CP ${poi.cp}!`)
+  }
 
-    const dist = geo.position ? distanceMeters(geo.position, poi) : null
-    logCatchAttempt({ outcome: 'caught', distance: dist, accuracy: geo.accuracy, poi })
+  function handleFlee(poi) {
+    setBalls(b => Math.max(0, b - 1))
+    logCatchAttempt({ outcome: 'fled', accuracy: geo.accuracy, poi })
+    setEncounter(null)
+    showToast(`${poi.emoji} ${poi.name} fled!`)
+  }
 
-    const nextCaught = new Set(caught)
-    nextCaught.add(poi.id)
-    setCaught(nextCaught)
-
-    const key = poi.cluster
-    if (key && CLUSTER_META[key] && !unlockedRareClusters.has(key)) {
-      const clusterDone = (spawned || []).filter(p => p.cluster === key).every(p => nextCaught.has(p.id))
-      if (clusterDone) {
-        setUnlockedRareClusters(prev => new Set([...prev, key]))
-        const c = CLUSTER_META[key]
-        showToast(`${c.name} complete! A rare ${c.rareEmoji} appeared!`)
-        return
-      }
-    }
-
-    showToast(`Caught ${poi.emoji} ${poi.name}!`)
+  function handleRunAway() {
+    setEncounter(null)
   }
 
   function recenter() {
     if (geo.position && map) map.setView([geo.position.lat, geo.position.lng], 17)
   }
 
-  const showDenied   = geo.status === 'denied'
-  const totalPossible = (spawned?.length ?? 0) + unlockedRareClusters.size
-
-  // Show waiting screen until creatures spawn
+  const showDenied  = geo.status === 'denied'
+  const liveCount   = allPois.length
   const showWaiting = started && !spawned && geo.status !== 'denied'
 
   return (
     <div className="app-shell">
-      {/* Full-screen map */}
       <div className="map-wrap">
         <MapContainer center={[FALLBACK_CENTER.lat, FALLBACK_CENTER.lng]} zoom={spawned ? 17 : 14} className="app-map">
           <TileLayer
@@ -325,15 +302,18 @@ function App() {
         <div className="top-center">
           <GpsStatusBadge geo={geo} />
         </div>
-        <button className="nearby-btn" title="Nearby Pokémon" aria-label="Nearby">🔭</button>
+        <button className="nearby-btn" title="Nearby" aria-label="Nearby">🔭</button>
       </div>
 
       {/* Bottom nav */}
       <div className="bottom-nav">
-        <button className="nav-btn" aria-label="Items">🎒<span>Items</span></button>
+        <div className="nav-btn-wrap">
+          <button className="nav-btn" aria-label="Items">🎒<span>Items</span></button>
+          <span className="ball-count-pill">{balls} balls</span>
+        </div>
         <div className="nav-center">
-          <div className="caught-badge">{caught.size} / {totalPossible}</div>
-          <button className="pokeball-nav-btn" onClick={recenter} title="Recenter" aria-label="Recenter on me">
+          <div className="caught-badge">{caught.size} caught · {liveCount} nearby</div>
+          <button className="pokeball-nav-btn" onClick={recenter} title="Recenter" aria-label="Recenter">
             <div className="pokeball"></div>
           </button>
         </div>
@@ -344,14 +324,18 @@ function App() {
       {!started && <StartScreen onStart={() => { localStorage.setItem('gps_started', '1'); setStarted(true) }} />}
       {showWaiting && !gpsStuck && <WaitingForGps />}
       {showDenied && <DeniedModal />}
+
+      {/* Throw minigame — full screen encounter */}
       {encounter && (
-        <EncounterCard
+        <ThrowMinigame
           poi={encounter}
-          geo={geo}
+          balls={balls}
           onCatch={handleCatch}
-          onFlee={() => setEncounter(null)}
+          onFlee={handleFlee}
+          onRunAway={handleRunAway}
         />
       )}
+
       {gpsStuck && geo.status === 'waiting' && <GpsStuckBanner />}
       {toast && <div className="toast" role="status">{toast}</div>}
     </div>
