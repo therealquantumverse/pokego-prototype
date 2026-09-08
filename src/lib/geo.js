@@ -87,7 +87,7 @@ export function useGeolocation(enabled = true) {
     // StrictMode double-invokes effects in dev — this cleanup is what prevents
     // two live watchers, doubled log events, and a leak (opus555 finding #2).
     return () => navigator.geolocation.clearWatch(watchId)
-  }, [])
+  }, [enabled])
 
   return state
 }
