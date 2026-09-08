@@ -129,6 +129,20 @@ function StartScreen({ onStart }) {
   )
 }
 
+function GpsStuckBanner() {
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent)
+  const hint = isIOS
+    ? 'Settings → Privacy & Security → Location Services → Safari → While Using'
+    : 'Tap the lock icon in your address bar → Site settings → Location → Allow'
+  return (
+    <div className="gps-stuck-banner">
+      <p>No GPS signal after 20 s. Check that Location Services is on:</p>
+      <p className="gps-stuck-hint">{hint}</p>
+      <button className="btn-gps-retry" onClick={() => window.location.reload()}>Retry GPS</button>
+    </div>
+  )
+}
+
 // ── App ──────────────────────────────────────────────────────────────────────
 
 function App() {
@@ -142,8 +156,20 @@ function App() {
   const [unlockedRareClusters, setUnlockedRareClusters] = useState(() => new Set())
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
+  const [gpsStuck, setGpsStuck] = useState(false)
+  const stuckTimer = useRef(null)
 
   useEffect(() => () => clearTimeout(toastTimer.current), [])
+
+  useEffect(() => {
+    if (geo.status === 'waiting') {
+      stuckTimer.current = setTimeout(() => setGpsStuck(true), 20000)
+    } else {
+      clearTimeout(stuckTimer.current)
+      setGpsStuck(false)
+    }
+    return () => clearTimeout(stuckTimer.current)
+  }, [geo.status])
 
   const showToast = useCallback((msg) => {
     setToast(msg)
@@ -253,6 +279,7 @@ function App() {
         <RecenterButton map={map} position={geo.position} />
         {!started && <StartScreen onStart={() => setStarted(true)} />}
         {showDenied && <DeniedModal />}
+        {gpsStuck && geo.status === 'waiting' && <GpsStuckBanner />}
         {toast && <div className="toast" role="status">{toast}</div>}
       </div>
     </div>
