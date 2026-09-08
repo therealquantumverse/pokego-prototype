@@ -73,15 +73,25 @@ function GpsStatusBadge({ geo }) {
 
 function DeniedModal() {
   const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent)
-  const instructions = isIOS
-    ? 'Settings → Privacy & Security → Location Services → Safari → "While Using"'
-    : 'Tap the lock icon in your browser address bar → Site settings → Location → Allow'
   return (
     <div className="modal-backdrop" role="alertdialog" aria-modal="true">
       <div className="modal">
-        <h2>📍 Location blocked</h2>
-        <p>This game needs GPS access to work.</p>
-        <p className="modal-instructions">{instructions}</p>
+        <h2>📍 Location blocked for this site</h2>
+        <p>Your iPhone's Location Services is on — but Safari has blocked <em>this page</em> specifically.</p>
+        {isIOS ? (
+          <>
+            <p className="modal-instructions modal-instructions--step">
+              <strong>Quick fix:</strong> In Safari's address bar, tap the <strong>aA</strong> icon → <strong>Website Settings</strong> → <strong>Location</strong> → <strong>Allow</strong>
+            </p>
+            <p className="modal-instructions modal-instructions--alt">
+              Or: Settings → Privacy &amp; Security → Location Services → Safari → While Using
+            </p>
+          </>
+        ) : (
+          <p className="modal-instructions">
+            Tap the lock icon in your browser address bar → Site settings → Location → Allow
+          </p>
+        )}
         <p className="modal-instructions">Then tap Reload.</p>
         <button className="btn-primary" onClick={() => window.location.reload()}>Reload</button>
       </div>
@@ -90,15 +100,11 @@ function DeniedModal() {
 }
 
 function GpsStuckBanner() {
-  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent)
-  const hint = isIOS
-    ? 'Settings → Privacy & Security → Location Services → Safari → While Using'
-    : 'Tap the lock icon in your address bar → Site settings → Location → Allow'
   return (
     <div className="gps-stuck-banner">
-      <p>⚠️ No GPS signal after 20s</p>
-      <p className="gps-stuck-hint">{hint}</p>
-      <button className="btn-gps-retry" onClick={() => window.location.reload()}>Retry GPS</button>
+      <p>📡 GPS signal is slow</p>
+      <p className="gps-stuck-hint">Try moving near a window or stepping outside for a clear sky view. Location permission is already granted.</p>
+      <button className="btn-gps-retry" onClick={() => window.location.reload()}>Retry</button>
     </div>
   )
 }
@@ -148,7 +154,7 @@ function getArm() {
 // ── App ───────────────────────────────────────────────────────────────────────
 
 function App() {
-  const [started, setStarted] = useState(false)
+  const [started, setStarted] = useState(() => localStorage.getItem('gps_started') === '1')
   const geo = useGeolocation(started)
   const [arm] = useState(getArm)
   const [map, setMap] = useState(null)
@@ -309,7 +315,7 @@ function App() {
       </div>
 
       {/* Screens & overlays */}
-      {!started && <StartScreen onStart={() => setStarted(true)} />}
+      {!started && <StartScreen onStart={() => { localStorage.setItem('gps_started', '1'); setStarted(true) }} />}
       {showDenied && <DeniedModal />}
       {encounter && (
         <EncounterCard
