@@ -1,4 +1,4 @@
-export const ACCURACY_GATE = 25
+export const ACCURACY_GATE = 80
 export const CATCH_RADIUS  = 50
 
 export const GEO_OPTIONS = {
