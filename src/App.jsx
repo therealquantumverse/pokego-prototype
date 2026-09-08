@@ -8,24 +8,29 @@ import { logCatchAttempt } from './lib/log'
 import { POIS, CLUSTERS } from './pois'
 import './App.css'
 
-// ── Map helpers ─────────────────────────────────────────────────────────────
+// ── Marker icons ─────────────────────────────────────────────────────────────
 
 const playerIcon = L.divIcon({
-  className: 'player-icon',
-  html: `<div class="player-dot"></div>`,
-  iconSize: [18, 18],
-  iconAnchor: [9, 9],
+  className: '',
+  html: `<div class="player-pokeball"></div>`,
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
 })
 
-function makePOIIcon(poi, state) {
-  const cls = ['poi-icon', state, poi.isRare ? 'rare' : ''].filter(Boolean).join(' ')
+function makeCreatureIcon(poi, state) {
+  const cls = ['creature-wrap', state, poi.isRare ? 'rare' : ''].filter(Boolean).join(' ')
   return L.divIcon({
     className: '',
-    html: `<div class="${cls}"><span>${poi.emoji}</span></div>`,
-    iconSize: [38, 38],
-    iconAnchor: [19, 19],
+    html: `<div class="${cls}">
+      <div class="creature-emoji">${poi.emoji}</div>
+      <div class="creature-shadow"></div>
+    </div>`,
+    iconSize: [44, 52],
+    iconAnchor: [22, 50],
   })
 }
+
+// ── Map helpers ───────────────────────────────────────────────────────────────
 
 function MapBridge({ onMap }) {
   const map = useMap()
@@ -33,7 +38,6 @@ function MapBridge({ onMap }) {
   return null
 }
 
-// Centers on first fix only; subsequent updates move the marker not the view.
 function FirstFixCenter({ target }) {
   const map = useMap()
   const done = useRef(false)
@@ -51,79 +55,35 @@ function AccuracyCircle({ position, accuracy }) {
     <Circle
       center={[position.lat, position.lng]}
       radius={accuracy}
-      pathOptions={{ color: '#2563eb', weight: 1, fillColor: '#2563eb', fillOpacity: 0.12, dashArray: '4 4' }}
+      pathOptions={{ color: '#e31e24', weight: 1, fillColor: '#e31e24', fillOpacity: 0.08, dashArray: '4 4' }}
     />
   )
+}
+
+// ── UI components ─────────────────────────────────────────────────────────────
+
+function GpsStatusBadge({ geo }) {
+  const calibrated = isCalibrated(geo)
+  if (geo.status === 'denied') return <span className="gps-badge denied">Location Off</span>
+  if (geo.status === 'unavailable' || geo.status === 'timeout') return <span className="gps-badge unavailable">GPS unavail.</span>
+  if (geo.status === 'waiting' || geo.status === 'idle') return <span className="gps-badge calibrating">GPS acquiring…</span>
+  if (!calibrated) return <span className="gps-badge calibrating">{Math.round(geo.accuracy)}m / {ACCURACY_GATE}m</span>
+  return <span className="gps-badge ready">GPS ready</span>
 }
 
 function DeniedModal() {
   const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent)
   const instructions = isIOS
-    ? 'Go to Settings → Privacy & Security → Location Services → Safari → set to "While Using".'
-    : 'Tap the 🔒 lock icon in your browser address bar → Site settings → Location → Allow.'
+    ? 'Settings → Privacy & Security → Location Services → Safari → "While Using"'
+    : 'Tap the lock icon in your browser address bar → Site settings → Location → Allow'
   return (
     <div className="modal-backdrop" role="alertdialog" aria-modal="true">
       <div className="modal">
-        <h2>Location blocked</h2>
-        <p>This game needs your GPS position to work. Your browser has location turned off for this page.</p>
+        <h2>📍 Location blocked</h2>
+        <p>This game needs GPS access to work.</p>
         <p className="modal-instructions">{instructions}</p>
-        <p className="modal-instructions">Then tap Reload below.</p>
+        <p className="modal-instructions">Then tap Reload.</p>
         <button className="btn-primary" onClick={() => window.location.reload()}>Reload</button>
-      </div>
-    </div>
-  )
-}
-
-function HeaderState({ geo, caught, total }) {
-  const calibrated = isCalibrated(geo)
-  const gpsLabel = () => {
-    if (geo.status === 'denied') return <span className="header-state denied">Location off</span>
-    if (geo.status === 'unavailable' || geo.status === 'timeout')
-      return <span className="header-state unavailable">GPS unavailable</span>
-    if (geo.status === 'waiting' || geo.status === 'idle')
-      return <span className="header-state calibrating">GPS acquiring…</span>
-    if (!calibrated)
-      return <span className="header-state calibrating">GPS calibrating… ({Math.round(geo.accuracy)}m / {ACCURACY_GATE}m)</span>
-    return <span className="header-state ready">GPS ready ({Math.round(geo.accuracy)}m)</span>
-  }
-  return (
-    <>
-      {gpsLabel()}
-      <span className="header-caught">{caught}/{total} caught</span>
-    </>
-  )
-}
-
-function RecenterButton({ map, position }) {
-  return (
-    <button
-      className="recenter"
-      title="Recenter on me"
-      aria-label="Recenter on me"
-      onClick={() => { if (position && map) map.setView([position.lat, position.lng], 17) }}
-    >
-      ◎
-    </button>
-  )
-}
-
-function getArm() {
-  try {
-    const p = new URLSearchParams(window.location.search).get('arm')
-    if (p === 'b') return 'B'
-    if (p === 'a') return 'A'
-  } catch {}
-  return 'A'
-}
-
-function StartScreen({ onStart }) {
-  return (
-    <div className="modal-backdrop">
-      <div className="modal">
-        <h2>PokéGo Prototype</h2>
-        <p>Tap below to enable your GPS and start the walk on Corona Ave.</p>
-        <p className="modal-instructions">When your browser asks "Allow location?", tap <strong>Allow</strong>.</p>
-        <button className="btn-primary" onClick={onStart}>Enable GPS &amp; Start</button>
       </div>
     </div>
   )
@@ -136,14 +96,56 @@ function GpsStuckBanner() {
     : 'Tap the lock icon in your address bar → Site settings → Location → Allow'
   return (
     <div className="gps-stuck-banner">
-      <p>No GPS signal after 20 s. Check that Location Services is on:</p>
+      <p>⚠️ No GPS signal after 20s</p>
       <p className="gps-stuck-hint">{hint}</p>
       <button className="btn-gps-retry" onClick={() => window.location.reload()}>Retry GPS</button>
     </div>
   )
 }
 
-// ── App ──────────────────────────────────────────────────────────────────────
+function StartScreen({ onStart }) {
+  return (
+    <div className="start-backdrop">
+      <div className="start-pokeball" aria-hidden="true"></div>
+      <h1 className="start-logo">Poké<em>GO</em></h1>
+      <p className="start-tagline">Elmhurst Edition · Corona Ave</p>
+      <button className="btn-start" onClick={onStart}>▶ Enable GPS &amp; Start</button>
+      <p className="start-hint">Tap Allow when your browser asks for location</p>
+    </div>
+  )
+}
+
+function EncounterCard({ poi, geo, onCatch, onFlee }) {
+  const dist = geo.position ? distanceMeters(geo.position, poi) : null
+  const creature = poi.name.split(' ').slice(1).join(' ') || poi.name
+  return (
+    <div className="encounter-backdrop" onClick={onFlee}>
+      <div className="encounter-card" onClick={e => e.stopPropagation()}>
+        <div className="encounter-header">
+          <span className="encounter-emoji">{poi.emoji}</span>
+          <h2 className="encounter-name">{creature}</h2>
+          {dist != null && <p className="encounter-dist">{Math.round(dist)}m away</p>}
+          {poi.isRare && <span className="encounter-rare-badge">✨ RARE</span>}
+        </div>
+        <button className="btn-catch" onClick={onCatch}>🎯 Catch!</button>
+        <button className="btn-flee" onClick={onFlee}>Run Away</button>
+      </div>
+    </div>
+  )
+}
+
+// ── A/B arm from URL ──────────────────────────────────────────────────────────
+
+function getArm() {
+  try {
+    const p = new URLSearchParams(window.location.search).get('arm')
+    if (p === 'b') return 'B'
+    if (p === 'a') return 'A'
+  } catch {}
+  return 'A'
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
 
 function App() {
   const [started, setStarted] = useState(false)
@@ -155,6 +157,7 @@ function App() {
   const [caught, setCaught] = useState(() => new Set())
   const [unlockedRareClusters, setUnlockedRareClusters] = useState(() => new Set())
   const [toast, setToast] = useState(null)
+  const [encounter, setEncounter] = useState(null)
   const toastTimer = useRef(null)
   const [gpsStuck, setGpsStuck] = useState(false)
   const stuckTimer = useRef(null)
@@ -177,7 +180,6 @@ function App() {
     toastTimer.current = setTimeout(() => setToast(null), 2800)
   }, [])
 
-  // Merge regular POIs + any unlocked rares into one list.
   const allPois = useMemo(() => {
     const rares = Object.entries(CLUSTERS)
       .filter(([key]) => unlockedRareClusters.has(key))
@@ -192,40 +194,49 @@ function App() {
     return distanceMeters(geo.position, poi) <= CATCH_RADIUS ? 'catchable' : 'locked'
   }
 
-  function handleCatch(poi) {
-    if (caught.has(poi.id)) return
+  function handleMarkerClick(poi) {
+    if (caught.has(poi.id)) {
+      showToast(`Already caught ${poi.emoji}`)
+      return
+    }
 
     const dist = geo.position ? distanceMeters(geo.position, poi) : null
-    const accuracy = geo.accuracy
 
-    // Arm A gating
     if (arm === 'A') {
       if (!isCalibrated(geo) || !geo.position) {
-        showToast(`GPS still calibrating — wait for accuracy < ${ACCURACY_GATE}m`)
-        logCatchAttempt({ arm, outcome: 'gate_blocked', distance: dist, accuracy, poi })
+        showToast(`GPS calibrating — wait for accuracy < ${ACCURACY_GATE}m`)
+        logCatchAttempt({ arm, outcome: 'gate_blocked', distance: dist, accuracy: geo.accuracy, poi })
         return
       }
       if (dist > CATCH_RADIUS) {
-        showToast(`Too far! ${Math.round(dist)}m away — need within ${CATCH_RADIUS}m`)
-        logCatchAttempt({ arm, outcome: 'gate_blocked', distance: dist, accuracy, poi })
+        showToast(`Too far! ${Math.round(dist)}m — need within ${CATCH_RADIUS}m`)
+        logCatchAttempt({ arm, outcome: 'gate_blocked', distance: dist, accuracy: geo.accuracy, poi })
         return
       }
     }
 
-    logCatchAttempt({ arm, outcome: 'caught', distance: dist, accuracy, poi })
+    setEncounter(poi)
+  }
+
+  function handleCatch() {
+    const poi = encounter
+    if (!poi) return
+    setEncounter(null)
+
+    const dist = geo.position ? distanceMeters(geo.position, poi) : null
+    logCatchAttempt({ arm, outcome: 'caught', distance: dist, accuracy: geo.accuracy, poi })
 
     const nextCaught = new Set(caught)
     nextCaught.add(poi.id)
     setCaught(nextCaught)
 
-    // Check cluster-complete
     const key = poi.cluster
     if (key && CLUSTERS[key] && !unlockedRareClusters.has(key)) {
       const clusterDone = POIS.filter(p => p.cluster === key).every(p => nextCaught.has(p.id))
       if (clusterDone) {
         setUnlockedRareClusters(prev => new Set([...prev, key]))
         const c = CLUSTERS[key]
-        showToast(`${c.name} complete! A rare ${c.rare.emoji} appeared nearby!`)
+        showToast(`${c.name} complete! A rare ${c.rare.emoji} appeared!`)
         return
       }
     }
@@ -234,25 +245,21 @@ function App() {
     showToast(`Caught ${poi.emoji} ${creature}!`)
   }
 
+  function recenter() {
+    if (geo.position && map) map.setView([geo.position.lat, geo.position.lng], 17)
+  }
+
   const showDenied = geo.status === 'denied'
-  const totalBase = POIS.length
+  const totalPossible = POIS.length + unlockedRareClusters.size
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <h1>PokéGo Prototype</h1>
-        <span className="header-sub">{START_LABEL}</span>
-        <span className="header-state-wrap">
-          <HeaderState geo={geo} caught={caught.size} total={totalBase + unlockedRareClusters.size} />
-          <span className="header-arm">arm {arm}</span>
-        </span>
-      </header>
+      {/* Full-screen map */}
       <div className="map-wrap">
         <MapContainer center={[START_COORD.lat, START_COORD.lng]} zoom={17} className="app-map">
-          {/* CartoDB Positron — free, no key, clean light style. */}
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
             subdomains="abcd"
             maxZoom={20}
           />
@@ -261,27 +268,60 @@ function App() {
           {geo.position && (
             <>
               <AccuracyCircle position={geo.position} accuracy={geo.accuracy} />
-              <Marker position={[geo.position.lat, geo.position.lng]} icon={playerIcon} title={START_LABEL} />
+              <Marker
+                position={[geo.position.lat, geo.position.lng]}
+                icon={playerIcon}
+                title={START_LABEL}
+              />
             </>
           )}
-          {allPois.map(poi => {
-            const state = poiState(poi)
-            return (
-              <Marker
-                key={poi.id}
-                position={[poi.lat, poi.lng]}
-                icon={makePOIIcon(poi, state)}
-                eventHandlers={{ click: () => handleCatch(poi) }}
-              />
-            )
-          })}
+          {allPois.map(poi => (
+            <Marker
+              key={poi.id}
+              position={[poi.lat, poi.lng]}
+              icon={makeCreatureIcon(poi, poiState(poi))}
+              eventHandlers={{ click: () => handleMarkerClick(poi) }}
+            />
+          ))}
         </MapContainer>
-        <RecenterButton map={map} position={geo.position} />
-        {!started && <StartScreen onStart={() => setStarted(true)} />}
-        {showDenied && <DeniedModal />}
-        {gpsStuck && geo.status === 'waiting' && <GpsStuckBanner />}
-        {toast && <div className="toast" role="status">{toast}</div>}
       </div>
+
+      {/* Top overlay */}
+      <div className="top-bar">
+        <button className="trainer-avatar" title="Trainer" aria-label="Trainer profile">🧢</button>
+        <div className="top-center">
+          <GpsStatusBadge geo={geo} />
+        </div>
+        <span className="arm-pill">arm {arm}</span>
+        <button className="nearby-btn" title="Nearby Pokémon" aria-label="Nearby">🔭</button>
+      </div>
+
+      {/* Bottom nav */}
+      <div className="bottom-nav">
+        <button className="nav-btn" aria-label="Items">🎒<span>Items</span></button>
+        <div className="nav-center">
+          <div className="caught-badge">{caught.size} / {totalPossible}</div>
+          <button className="pokeball-nav-btn" onClick={recenter} title="Recenter" aria-label="Recenter on me">
+            <div className="pokeball"></div>
+          </button>
+        </div>
+        <button className="nav-btn" aria-label="Pokédex">📖<span>Pokédex</span></button>
+      </div>
+
+      {/* Screens & overlays */}
+      {!started && <StartScreen onStart={() => setStarted(true)} />}
+      {showDenied && <DeniedModal />}
+      {encounter && (
+        <EncounterCard
+          poi={encounter}
+          geo={geo}
+          arm={arm}
+          onCatch={handleCatch}
+          onFlee={() => setEncounter(null)}
+        />
+      )}
+      {gpsStuck && geo.status === 'waiting' && <GpsStuckBanner />}
+      {toast && <div className="toast" role="status">{toast}</div>}
     </div>
   )
 }
