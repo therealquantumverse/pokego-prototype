@@ -23,17 +23,17 @@ import { rollIVs, computeCP, computeHP, MAX_WILD_LEVEL } from './stats.js'
 // ~0.00045° latitude ≈ 50 m. Longitude cells narrow toward the poles; at mid
 // latitudes they run ~35–40 m wide, which is close enough for gameplay.
 //
-// Cell size, density and scan radius are tuned together against
-// scripts/verify-spawn.mjs: expected live spawns per cell equals SPAWN_DENSITY
-// exactly, so catchables within the 50 m radius ≈ (7854 / cellArea) * density.
-// At these values that lands near 1.2, which keeps something in reach most of
-// the time without turning the map into a swarm.
+// Cell size, density and CATCH_RADIUS are tuned together against
+// scripts/verify-spawn.mjs: expected catchables ≈ (π r² / cellArea) * density.
+// At r = 70 m and density 0.40 that lands near 3.3, so a stationary player has
+// nothing in reach only ~2% of the time. The earlier 50 m / 0.30 pairing gave
+// 1.2 and left the map dead 24% of the time.
 export const CELL_DEG = 0.00045
 
 export const SPAWN_WINDOW_MS = 30 * 60 * 1000
 
 // Fraction of cells that produce a creature in a given window.
-export const SPAWN_DENSITY = 0.30
+export const SPAWN_DENSITY = 0.40
 
 // Cells scanned in each direction from the player. 3 → a 7×7 block, ~175 m.
 export const SCAN_RADIUS_CELLS = 3
