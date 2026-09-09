@@ -1,5 +1,10 @@
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+// maplibre resolves its worker with new URL(`./${name}`, import.meta.url). The
+// template literal defeats Vite's static analysis, so the worker is never
+// emitted and the request 404s to index.html — which the worker then tries to
+// parse as JS ("Unexpected token '<'"). Point it at a URL Vite does emit.
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ACCURACY_GATE, CATCH_RADIUS, STARTING_BALLS } from './config'
 import { useGeolocation, isCalibrated, distanceMeters } from './lib/geo'
@@ -7,6 +12,8 @@ import { logCatchAttempt } from './lib/log'
 import { spawnsNear, rememberHome, getInitialMapCenter } from './lib/spawn'
 import ThrowMinigame from './ThrowMinigame'
 import './App.css'
+
+maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
 // ── Map tile style (OSM raster — CSS filter below makes it dark) ──────────────
 
