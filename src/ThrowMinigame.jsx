@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { cpmAt, ivPercent } from './lib/stats'
+import { creatureSvg } from './lib/creatureArt'
+import { useArCamera } from './lib/useArCamera'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const RING_PERIOD = 2400   // ms — full shrink cycle
@@ -12,9 +14,9 @@ function ringScaleNow(startMs) {
 }
 
 function throwBonusFor(scale) {
-  if (scale <= 0.42) return { label: 'Excellent!', mult: 2.0, cls: 'excellent' }
-  if (scale <= 0.68) return { label: 'Great!',     mult: 1.7, cls: 'great'     }
-  return                     { label: 'Nice!',      mult: 1.3, cls: 'nice'      }
+  if (scale <= 0.42) return { label: 'Excellent!', mult: 2.0, cls: 'excellent', xp: 100 }
+  if (scale <= 0.68) return { label: 'Great!',     mult: 1.7, cls: 'great',     xp: 50  }
+  return                     { label: 'Nice!',      mult: 1.3, cls: 'nice',      xp: 10  }
 }
 
 function catchProbability(bcr, level, throwMult, curveMult) {
@@ -64,6 +66,8 @@ export default function ThrowMinigame({ poi, balls, onCatch, onFlee, onRunAway }
   const [result, setResult]       = useState(null)    // { caught, fled, bonus, isCurve }
   const [throwLabel, setThrowLabel] = useState(null)  // brief bonus label during flight
   const [isCurve, setIsCurve]     = useState(false)   // show curveball indicator
+
+  const ar = useArCamera()
 
   useEffect(() => () => cancelAnimationFrame(animRef.current), [])
 
@@ -229,13 +233,40 @@ export default function ThrowMinigame({ poi, balls, onCatch, onFlee, onRunAway }
   const accentColor = TYPE_COLOR[poi.types?.[0]] ?? '#60a5fa'
   const bHome = { left: '50%', top: '82%' }
 
+  const arLive = ar.status === 'on'
+
   return (
-    <div className="throw-screen" ref={containerRef}>
+    <div className={`throw-screen${arLive ? ' ar-live' : ''}`} ref={containerRef}>
+      {/* Live camera passthrough — sits behind everything when AR is on */}
+      <video
+        ref={ar.videoRef}
+        className="ar-video"
+        playsInline
+        muted
+        autoPlay
+        style={{ opacity: arLive ? 1 : 0 }}
+      />
+
       {/* Radial glow behind creature */}
       <div
         className="throw-glow"
         style={{ background: `radial-gradient(ellipse 60% 40% at 50% 36%, ${accentColor}26 0%, transparent 70%)` }}
       />
+
+      <button
+        className={`ar-toggle${arLive ? ' on' : ''}`}
+        onClick={() => (arLive ? ar.stop() : ar.start())}
+        disabled={ar.status === 'starting'}
+      >
+        {ar.status === 'starting' ? '…' : arLive ? 'AR on' : 'AR'}
+      </button>
+      {(ar.status === 'denied' || ar.status === 'unsupported') && (
+        <div className="ar-note">
+          {ar.status === 'denied'
+            ? 'Camera blocked — allow it in Settings to use AR'
+            : 'Camera not available on this device'}
+        </div>
+      )}
 
       {/* Top bar */}
       <div className="throw-topbar">
@@ -257,13 +288,12 @@ export default function ThrowMinigame({ poi, balls, onCatch, onFlee, onRunAway }
         </div>
         <div
           className={[
-            'throw-creature-emoji',
+            'throw-creature-art',
             phase === 'result' && result?.caught  ? 'creature-caught'    : '',
             phase === 'result' && result && !result.caught ? 'creature-broke-out' : '',
           ].filter(Boolean).join(' ')}
-        >
-          {poi.emoji}
-        </div>
+          dangerouslySetInnerHTML={{ __html: creatureSvg(poi) }}
+        />
         {isCurve && phase === 'idle' && (
           <div className="throw-curve-hint">Curveball!</div>
         )}

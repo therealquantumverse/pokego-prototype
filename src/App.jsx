@@ -10,7 +10,9 @@ import { ACCURACY_GATE, CATCH_RADIUS, STARTING_BALLS } from './config'
 import { useGeolocation, isCalibrated, distanceMeters } from './lib/geo'
 import { logCatchAttempt } from './lib/log'
 import { spawnsNear, rememberHome, getInitialMapCenter } from './lib/spawn'
+import { creatureSvg, trainerSvg } from './lib/creatureArt'
 import ThrowMinigame from './ThrowMinigame'
+import { PokedexScreen, BagScreen, TrainerScreen, NearbyScreen } from './Screens'
 import './App.css'
 
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
@@ -41,7 +43,8 @@ const FALLBACK_CENTER = getInitialMapCenter() || { lat: 40.7128, lng: -74.006 }
 
 function makePlayerEl() {
   const el = document.createElement('div')
-  el.className = 'player-pokeball'
+  el.className = 'player-trainer'
+  el.innerHTML = `<div class="player-ring"></div>${trainerSvg()}`
   return el
 }
 
@@ -49,7 +52,7 @@ function makeCreatureEl(poi, state, onTap) {
   const wrap = document.createElement('div')
   wrap.className = ['creature-wrap', state, RARE_TIERS.has(poi.rarity) ? 'rare' : '']
     .filter(Boolean).join(' ')
-  wrap.innerHTML = `<div class="creature-emoji">${poi.emoji}</div><div class="creature-shadow"></div>`
+  wrap.innerHTML = `<div class="creature-art">${creatureSvg(poi)}</div><div class="creature-shadow"></div>`
   // Both click (desktop) and touchend (mobile) — touchend is critical on iOS
   const fire = (e) => { e.preventDefault(); e.stopPropagation(); onTap(poi) }
   wrap.addEventListener('click', fire)
@@ -181,6 +184,16 @@ export default function App() {
   const [caught, setCaught] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem('pokego_caught') || '[]')) } catch { return new Set() }
   })
+  // `caught` holds per-spawn seeds so a caught creature stays gone. The Pokédex
+  // needs species identity instead, which those seeds do not carry.
+  const [dex, setDex] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('pokego_dex') || '[]')) } catch { return new Set() }
+  })
+  const [xp, setXp] = useState(() => {
+    const saved = parseInt(localStorage.getItem('pokego_xp') ?? '', 10)
+    return Number.isFinite(saved) ? saved : 0
+  })
+  const [screen, setScreen] = useState(null)   // 'dex' | 'bag' | 'trainer' | 'nearby'
   const [balls, setBalls] = useState(() => {
     const saved = parseInt(localStorage.getItem('pokego_balls') ?? '', 10)
     return Number.isFinite(saved) ? saved : STARTING_BALLS
@@ -352,6 +365,14 @@ export default function App() {
     localStorage.setItem('pokego_balls', String(balls))
   }, [balls])
 
+  useEffect(() => {
+    localStorage.setItem('pokego_dex', JSON.stringify([...dex]))
+  }, [dex])
+
+  useEffect(() => {
+    localStorage.setItem('pokego_xp', String(xp))
+  }, [xp])
+
   const showToast = useCallback((msg) => {
     setToast(msg)
     clearTimeout(toastTimer.current)
@@ -376,10 +397,17 @@ export default function App() {
 
   function handleCatch(poi, bonus) {
     setCaught(prev => new Set(prev).add(poi.id))
+    const newSpecies = !dex.has(poi.speciesId)
+    setDex(prev => new Set(prev).add(poi.speciesId))
+    setXp(x => x + 100 + (bonus.xp ?? 0) + (newSpecies ? 500 : 0))
     setBalls(b => Math.max(0, b - 1))
     logCatchAttempt({ outcome: 'caught', bonus: bonus.label, accuracy: geo.accuracy, poi })
     setEncounter(null)
-    showToast(`${bonus.label} Caught ${poi.emoji} ${poi.name} — CP ${poi.cp}!`)
+    showToast(
+      newSpecies
+        ? `New entry! ${poi.name} registered — CP ${poi.cp}`
+        : `${bonus.label} Caught ${poi.name} — CP ${poi.cp}!`,
+    )
   }
 
   function handleFlee(poi) {
@@ -397,6 +425,10 @@ export default function App() {
 
   const showDenied  = geo.status === 'denied'
   const liveCount   = allPois.length
+  const inRangeCount = useMemo(
+    () => (geo.position ? allPois.filter(p => distanceMeters(geo.position, p) <= CATCH_RADIUS).length : 0),
+    [allPois, geo.position],
+  )
   // Only block with waiting screen before the very first GPS position arrives
   const showWaiting = started && !geo.position && geo.status !== 'denied'
 
@@ -407,15 +439,23 @@ export default function App() {
 
       {/* Top overlay */}
       <div className="top-bar">
-        <button className="trainer-avatar" aria-label="Trainer profile">🧢</button>
+        <button
+          className="trainer-avatar"
+          onClick={() => setScreen('trainer')}
+          aria-label="Trainer profile"
+          dangerouslySetInnerHTML={{ __html: trainerSvg() }}
+        />
         <div className="top-center"><GpsStatusBadge geo={geo} /></div>
-        <button className="nearby-btn" aria-label="Nearby">🔭</button>
+        <button className="nearby-btn" onClick={() => setScreen('nearby')} aria-label="Nearby">
+          🔭
+          {inRangeCount > 0 && <span className="nearby-dot">{inRangeCount}</span>}
+        </button>
       </div>
 
       {/* Bottom nav */}
       <div className="bottom-nav">
         <div className="nav-btn-wrap">
-          <button className="nav-btn" aria-label="Items">🎒<span>Items</span></button>
+          <button className="nav-btn" onClick={() => setScreen('bag')} aria-label="Items">🎒<span>Items</span></button>
           <span className="ball-count-pill">{balls} balls</span>
         </div>
         <div className="nav-center">
@@ -424,7 +464,7 @@ export default function App() {
             <div className="pokeball" />
           </button>
         </div>
-        <button className="nav-btn" aria-label="Pokédex">📖<span>Pokédex</span></button>
+        <button className="nav-btn" onClick={() => setScreen('dex')} aria-label="Pokédex">📖<span>Pokédex</span></button>
       </div>
 
       {/* Screens */}
@@ -441,6 +481,20 @@ export default function App() {
           onCatch={handleCatch}
           onFlee={handleFlee}
           onRunAway={() => setEncounter(null)}
+        />
+      )}
+
+      {screen === 'dex'     && <PokedexScreen dex={dex} onClose={() => setScreen(null)} />}
+      {screen === 'bag'     && <BagScreen balls={balls} onClose={() => setScreen(null)} />}
+      {screen === 'trainer' && (
+        <TrainerScreen xp={xp} dex={dex} catches={caught.size} balls={balls} onClose={() => setScreen(null)} />
+      )}
+      {screen === 'nearby'  && (
+        <NearbyScreen
+          pois={allPois}
+          position={geo.position}
+          onSelect={(poi) => { setScreen(null); handleMarkerClick(poi) }}
+          onClose={() => setScreen(null)}
         />
       )}
 

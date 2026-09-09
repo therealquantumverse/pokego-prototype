@@ -243,38 +243,36 @@ body {
   box-shadow: inset 0 0 0 3px #ddd;
 }
 
-/* ── Player marker (mini Pokéball) ──────────────────────────────────────────── */
-.player-pokeball {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: linear-gradient(to bottom, var(--poke-red) 50%, #fff 50%);
-  border: 3px solid #fff;
+/* ── Player marker (trainer sprite) ─────────────────────────────────────────── */
+.player-trainer {
   position: relative;
-  box-shadow:
-    0 0 0 2.5px var(--poke-red),
-    0 0 12px rgba(227,30,36,0.6),
-    0 2px 8px rgba(0,0,0,0.7);
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
 }
-.player-pokeball::before {
-  content: '';
-  position: absolute;
-  left: 0; right: 0;
-  top: calc(50% - 1.5px);
-  height: 3px;
-  background: #fff;
+.player-trainer svg {
+  width: 46px;
+  height: 46px;
+  filter: drop-shadow(0 3px 8px rgba(0,0,0,0.85));
+  position: relative;
+  z-index: 2;
 }
-.player-pokeball::after {
-  content: '';
+.player-ring {
   position: absolute;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #fff;
-  border: 2px solid #bbb;
-  top: 50%;
   left: 50%;
+  top: 74%;
+  width: 58px;
+  height: 26px;
   transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(96,165,250,0.45) 0%, transparent 70%);
+  box-shadow: 0 0 14px rgba(96,165,250,0.55);
+  animation: player-ring-pulse 2.4s ease-in-out infinite;
+}
+@keyframes player-ring-pulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1);    opacity: 0.9; }
+  50%      { transform: translate(-50%, -50%) scale(1.18); opacity: 0.5; }
 }
 
 /* ── Wild creature markers ──────────────────────────────────────────────────── */
@@ -282,16 +280,17 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 44px;
-  height: 52px;
+  width: 46px;
+  height: 56px;
   cursor: pointer;
 }
 
-.creature-emoji {
-  font-size: 28px;
-  line-height: 1.1;
+.creature-art {
+  width: 46px;
+  height: 46px;
   filter: drop-shadow(0 3px 8px rgba(0,0,0,0.9));
 }
+.creature-art svg { width: 100%; height: 100%; display: block; }
 
 .creature-shadow {
   width: 20px;
@@ -302,12 +301,12 @@ body {
 }
 
 /* catchable: floating animation */
-.creature-wrap.catchable .creature-emoji {
+.creature-wrap.catchable .creature-art {
   animation: creature-float 2s ease-in-out infinite;
 }
 
 /* caught: greyed out */
-.creature-wrap.caught .creature-emoji {
+.creature-wrap.caught .creature-art {
   filter: grayscale(1) opacity(0.3) drop-shadow(0 2px 4px rgba(0,0,0,0.5));
   animation: none;
 }
@@ -315,16 +314,18 @@ body {
   opacity: 0.3;
 }
 
-/* locked: dark silhouette */
-.creature-wrap.locked .creature-emoji {
-  filter: brightness(0) opacity(0.35);
+/* Out of range: still fully drawn, just dimmed and smaller. Blacking these out
+   made a map holding 20 creatures look empty. */
+.creature-wrap.locked .creature-art {
+  filter: saturate(0.75) brightness(0.75) drop-shadow(0 3px 8px rgba(0,0,0,0.9));
+  transform: scale(0.82);
 }
 
 /* rare: extra glow */
-.creature-wrap.rare .creature-emoji {
+.creature-wrap.rare .creature-art {
   filter: drop-shadow(0 0 8px rgba(255,203,5,0.8)) drop-shadow(0 3px 8px rgba(0,0,0,0.9));
 }
-.creature-wrap.rare.catchable .creature-emoji {
+.creature-wrap.rare.catchable .creature-art {
   animation: creature-float-glow 2s ease-in-out infinite;
 }
 
@@ -823,20 +824,20 @@ body {
   100% { transform: scale(0.28); border-color: #4ade80; opacity: 0.6; }
 }
 
-.throw-creature-emoji {
-  font-size: 88px;
-  line-height: 1;
+.throw-creature-art {
+  width: 190px;
+  height: 190px;
   filter: drop-shadow(0 6px 20px rgba(0,0,0,0.8));
   animation: creature-float 2.2s ease-in-out infinite;
   position: relative;
   z-index: 2;
 }
 
-.throw-creature-emoji.creature-caught {
+.throw-creature-art.creature-caught {
   animation: catch-pulse 0.6s ease-out forwards;
 }
 
-.throw-creature-emoji.creature-broke-out {
+.throw-creature-art.creature-broke-out {
   animation: broke-out-shake 0.5s ease-in-out;
 }
 
@@ -990,4 +991,286 @@ body {
 @keyframes fade-in {
   from { opacity: 0; }
   to   { opacity: 1; }
+}
+
+/* ── Trainer avatar button (top-left) ───────────────────────────────────────── */
+.trainer-avatar { padding: 0; overflow: hidden; }
+.trainer-avatar svg { width: 100%; height: 100%; display: block; }
+
+.nearby-btn { position: relative; }
+.nearby-dot {
+  position: absolute;
+  top: -4px; right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #22c55e;
+  color: #06240f;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+  border: 2px solid #0b0e16;
+}
+
+/* ── Sheets (Pokédex / Bag / Trainer / Nearby) ──────────────────────────────── */
+.sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 1600;
+  background: rgba(4,6,12,0.72);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: flex-end;
+  animation: sheet-fade 0.18s ease-out;
+}
+@keyframes sheet-fade { from { opacity: 0 } to { opacity: 1 } }
+
+.sheet {
+  width: 100%;
+  max-height: 88%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #161a26 0%, #0d1017 100%);
+  border-top-left-radius: 22px;
+  border-top-right-radius: 22px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 -14px 40px rgba(0,0,0,0.6);
+  animation: sheet-rise 0.22s cubic-bezier(0.22,1,0.36,1);
+}
+@keyframes sheet-rise { from { transform: translateY(22px) } to { transform: none } }
+
+.sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.sheet-head h2 { margin: 0; font-size: 20px; letter-spacing: 0.2px; }
+.sheet-sub { margin: 3px 0 0; font-size: 12.5px; color: #8b90a3; }
+.sheet-close {
+  width: 34px; height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
+  color: #e8eaf2;
+  font-size: 15px;
+  cursor: pointer;
+}
+.sheet-body { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px 16px 28px; }
+.sheet-back {
+  background: none;
+  border: none;
+  color: #7dd3fc;
+  font-size: 14px;
+  padding: 0 0 12px;
+  cursor: pointer;
+}
+
+.art svg { width: 100%; height: 100%; display: block; }
+.art.silhouette svg { filter: brightness(0) opacity(0.42); }
+
+.chips { display: flex; gap: 6px; margin: 6px 0; flex-wrap: wrap; }
+.chip {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: #fff;
+}
+.rarity { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; }
+.rarity-common { color: #9ca3af }
+.rarity-uncommon { color: #4ade80 }
+.rarity-rare { color: #5ec8ff }
+.rarity-epic { color: #c07bff }
+.rarity-legendary { color: #ffcf3d }
+
+/* Pokédex */
+.dex-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.dex-cell {
+  background: rgba(255,255,255,0.045);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 8px 6px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  color: inherit;
+}
+.dex-cell:active { transform: scale(0.97) }
+.dex-cell .art { width: 74px; height: 74px }
+.dex-num { font-size: 10px; color: #6b7180; align-self: flex-start; padding-left: 2px }
+.dex-name { font-size: 11.5px; font-weight: 600; text-align: center; line-height: 1.25 }
+
+.dex-hero { display: flex; align-items: center; gap: 16px; margin-bottom: 12px }
+.dex-hero .art { width: 116px; height: 116px; flex-shrink: 0 }
+.dex-hero h3 { margin: 0 0 4px; font-size: 22px }
+.dex-desc { font-size: 14px; line-height: 1.55; color: #c3c8d6 }
+.dex-desc.muted { color: #7c8194 }
+
+.stat-rows { margin: 14px 0 }
+.stat-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; font-size: 12.5px }
+.stat-row > span { width: 62px; color: #8b90a3 }
+.stat-row > strong { width: 34px; text-align: right }
+.stat-bar { flex: 1; height: 7px; background: rgba(255,255,255,0.08); border-radius: 999px; overflow: hidden }
+.stat-bar > div { height: 100%; background: linear-gradient(90deg, #38bdf8, #4ade80); border-radius: 999px }
+
+.dex-facts { display: flex; gap: 8px; margin: 14px 0 }
+.dex-facts > div {
+  flex: 1;
+  background: rgba(255,255,255,0.05);
+  border-radius: 11px;
+  padding: 9px 8px;
+  text-align: center;
+}
+.dex-facts span { display: block; font-size: 10.5px; color: #8b90a3; margin-bottom: 3px }
+.dex-facts strong { font-size: 16px }
+
+.evo-chain h4 { margin: 16px 0 10px; font-size: 13px; color: #8b90a3; font-weight: 600 }
+.evo-row { display: flex; align-items: flex-start; gap: 2px }
+.evo-step { display: flex; align-items: flex-start; gap: 2px; flex: 1; min-width: 0 }
+.evo-mon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.evo-art { width: 58px; height: 58px }
+.evo-name { font-size: 10.5px; text-align: center; line-height: 1.25; word-break: break-word }
+.evo-arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #6b7180;
+  padding-top: 16px;
+  flex-shrink: 0;
+}
+.evo-arrow span { font-size: 20px; line-height: 1 }
+.evo-arrow small { font-size: 8.5px; white-space: nowrap }
+
+/* Bag */
+.item-list { list-style: none; margin: 0; padding: 0 }
+.item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255,255,255,0.045);
+  border-radius: 13px;
+}
+.item.empty { opacity: 0.5 }
+.item-icon { width: 38px; height: 38px; display: grid; place-items: center; flex-shrink: 0 }
+.item-icon .pokeball { width: 32px; height: 32px }
+.item-text { flex: 1 }
+.item-text strong { display: block; font-size: 14.5px }
+.item-text span { font-size: 12px; color: #8b90a3 }
+.item-qty { font-size: 16px; font-weight: 700; color: #e8eaf2 }
+.bag-warning { font-size: 13px; color: #fbbf24; margin-top: 12px }
+
+/* Trainer */
+.trainer-hero { display: flex; align-items: center; gap: 16px; margin-bottom: 18px }
+.trainer-big { width: 92px; height: 92px; flex-shrink: 0 }
+.trainer-big svg { width: 100%; height: 100% }
+.trainer-xp { flex: 1 }
+.trainer-xp span { font-size: 11.5px; color: #8b90a3 }
+.xp-bar { height: 9px; background: rgba(255,255,255,0.09); border-radius: 999px; overflow: hidden; margin-bottom: 6px }
+.xp-bar > div { height: 100%; background: linear-gradient(90deg, #fbbf24, #f97316); border-radius: 999px }
+.trainer-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px }
+.trainer-stats > div {
+  background: rgba(255,255,255,0.05);
+  border-radius: 13px;
+  padding: 13px;
+  text-align: center;
+}
+.trainer-stats strong { display: block; font-size: 22px; margin-bottom: 3px }
+.trainer-stats span { font-size: 11.5px; color: #8b90a3 }
+
+/* Nearby */
+.nearby-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px }
+.nearby-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  border-radius: 13px;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.04);
+  color: inherit;
+  text-align: left;
+  cursor: default;
+}
+.nearby-row.reachable {
+  border-color: rgba(74,222,128,0.4);
+  background: rgba(74,222,128,0.09);
+  cursor: pointer;
+}
+.nearby-row:not(.reachable) .art { filter: brightness(0.45) }
+.nearby-art { width: 48px; height: 48px; flex-shrink: 0 }
+.nearby-text { flex: 1 }
+.nearby-text strong { display: block; font-size: 14.5px }
+.nearby-text span { font-size: 11.5px; color: #8b90a3 }
+.nearby-dist { font-size: 14px; font-weight: 700; text-align: right }
+.nearby-dist small { display: block; font-size: 10px; font-weight: 500; color: #8b90a3 }
+.nearby-row.reachable .nearby-dist small { color: #4ade80 }
+
+/* ── AR camera ──────────────────────────────────────────────────────────────── */
+.ar-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 0.25s ease;
+  z-index: 0;
+}
+.throw-screen.ar-live { background: #000 }
+.throw-screen.ar-live .throw-glow { opacity: 0.5 }
+
+.ar-toggle {
+  position: absolute;
+  top: 64px;
+  right: 14px;
+  z-index: 12;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #e8eaf2;
+  background: rgba(12,16,26,0.7);
+  border: 1px solid rgba(255,255,255,0.18);
+  cursor: pointer;
+}
+.ar-toggle.on { background: rgba(74,222,128,0.22); border-color: #4ade80; color: #b9f6cd }
+.ar-toggle:disabled { opacity: 0.6 }
+
+.ar-note {
+  position: absolute;
+  top: 102px;
+  right: 14px;
+  z-index: 12;
+  max-width: 190px;
+  padding: 7px 11px;
+  border-radius: 10px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: #fcd34d;
+  background: rgba(12,16,26,0.85);
+  border: 1px solid rgba(252,211,77,0.3);
+}
+
+/* AR mode: creature casts a ground shadow so it sits in the scene */
+.throw-screen.ar-live .throw-creature-art {
+  filter: drop-shadow(0 14px 12px rgba(0,0,0,0.55));
 }
