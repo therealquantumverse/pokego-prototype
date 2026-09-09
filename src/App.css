@@ -30,18 +30,12 @@ body {
 }
 
 /* Map fills the entire shell */
+/* The vector style is authored dark, so no CSS invert is needed. That filter
+   also forced a counter-invert on every control to keep them legible. */
 .map-wrap {
   position: absolute;
   inset: 0;
   z-index: 0;
-  /* Dark theme: apply filter to the container div, NOT the WebGL canvas directly.
-     Filtering the canvas element itself can kill the WebGL context on mobile Safari. */
-  filter: invert(100%) hue-rotate(180deg) brightness(90%) contrast(88%) saturate(0.85);
-}
-/* Counter-invert MapLibre controls so they stay legible */
-.map-wrap .maplibregl-ctrl-attrib,
-.map-wrap .maplibregl-ctrl-group {
-  filter: invert(100%) hue-rotate(180deg) brightness(90%) contrast(88%) saturate(0.85);
 }
 
 /* ── Top overlay ────────────────────────────────────────────────────────────── */

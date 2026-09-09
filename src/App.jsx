@@ -10,31 +10,13 @@ import { ACCURACY_GATE, CATCH_RADIUS, STARTING_BALLS } from './config'
 import { useGeolocation, isCalibrated, distanceMeters } from './lib/geo'
 import { logCatchAttempt } from './lib/log'
 import { spawnsNear, rememberHome, getInitialMapCenter } from './lib/spawn'
+import { GAME_MAP_STYLE } from './mapStyle'
 import { creatureSvg, trainerSvg } from './lib/creatureArt'
 import ThrowMinigame from './ThrowMinigame'
 import { PokedexScreen, BagScreen, TrainerScreen, NearbyScreen } from './Screens'
 import './App.css'
 
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
-
-// ── Map tile style (OSM raster — CSS filter below makes it dark) ──────────────
-
-const MAP_STYLE = {
-  version: 8,
-  sources: {
-    osm: {
-      type: 'raster',
-      tiles: [
-        'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
-      ],
-      tileSize: 256,
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    },
-  },
-  layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
-}
 
 const RARE_TIERS = new Set(['rare', 'epic', 'legendary'])
 const FALLBACK_CENTER = getInitialMapCenter() || { lat: 40.7128, lng: -74.006 }
@@ -216,7 +198,7 @@ export default function App() {
     try {
       map = new maplibregl.Map({
         container: mapContainerRef.current,
-        style:     MAP_STYLE,
+        style:     GAME_MAP_STYLE,
         center:    [FALLBACK_CENTER.lng, FALLBACK_CENTER.lat],
         zoom:      17,
         pitch:     45,           // Pokémon GO perspective tilt
