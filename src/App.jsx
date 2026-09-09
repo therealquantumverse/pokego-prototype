@@ -272,6 +272,13 @@ export default function App() {
     }
   }, [geo.position])
 
+  // ── Derived ──────────────────────────────────────────────────────────────────
+
+  const allPois = useMemo(
+    () => (spawned || []).filter(p => !caught.has(p.id)),
+    [spawned, caught],
+  )
+
   // ── Creature markers: add/remove when spawn list changes ────────────────────
 
   useEffect(() => {
@@ -337,13 +344,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('pokego_balls', String(balls))
   }, [balls])
-
-  // ── Derived ──────────────────────────────────────────────────────────────────
-
-  const allPois = useMemo(
-    () => (spawned || []).filter(p => !caught.has(p.id)),
-    [spawned, caught],
-  )
 
   const showToast = useCallback((msg) => {
     setToast(msg)
